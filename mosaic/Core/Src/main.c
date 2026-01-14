@@ -99,8 +99,9 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   mosaic_send_init(&huart1);
-  /* USER CODE END 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ir_data, SENSOR_COUNT);
+
+  /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
