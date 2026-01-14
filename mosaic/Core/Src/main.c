@@ -20,12 +20,14 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
+#include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart_protocol.h"
+#include "ultrasonic.h"
 #include <stdlib.h>
 /* USER CODE END Includes */
 
@@ -49,14 +51,14 @@
 /* USER CODE BEGIN PV */
 #define SENSOR_COUNT 16
 volatile uint16_t ir_data[16];
-uint16_t ultrasonic_data[4];
+volatile uint16_t ultrasonic_data[4];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void LED_Update(void);
 /* USER CODE BEGIN PFP */
-
+void LED_Update(void);
+void Ultrasonic_Update(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,10 +98,13 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
   mosaic_send_init(&huart1);
-  /* USER CODE END 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ir_data, SENSOR_COUNT);
+
+  /* USER CODE END 2 */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -108,7 +113,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  LED_Update();
-	  for (int i = 0; i < 4; i++) ultrasonic_data[i] = (uint16_t)rand();
+	  Ultrasonic_Update();
 	  if (mosaic_send_sensors(ir_data, ultrasonic_data)){
 
 	  }
@@ -162,6 +167,7 @@ void SystemClock_Config(void)
   }
 }
 
+/* USER CODE BEGIN 4 */
 void LED_Update(void){
 	int min=16;
 		  for(int i=0;i<SENSOR_COUNT;i++){
@@ -244,8 +250,49 @@ void LED_Update(void){
 		  HAL_GPIO_WritePin(LED14_GPIO_Port, LED14_Pin, SET);
 		  HAL_GPIO_WritePin(LED15_GPIO_Port, LED15_Pin, SET);
 }
-/* USER CODE BEGIN 4 */
 
+
+
+
+void Ultrasonic_Update(void)
+{
+    static uint32_t us_timer = 0;
+    static uint8_t us_state = 0; // 0 = Trigger, 1 = Wait
+
+    // Sensor addresses
+    static const uint8_t us_addrs[4] = {0x80, 0xD0, 0xD6, 0xD2};
+
+    uint32_t current_time = HAL_GetTick();
+
+    switch(us_state) {
+        case 0: // STATE: TRIGGER
+            for(int i = 0; i < 4; i++) {
+                DYP_Trigger(us_addrs[i]);
+            }
+            // Capture time and move to wait state
+            us_timer = current_time;
+            us_state = 1;
+            break;
+
+        case 1: // STATE: WAIT
+            // Check if set time has passed
+            if ((current_time - us_timer) >= 160) {
+                // Time is up, read data
+                for(int i = 0; i < 4; i++) {
+                    int16_t val = DYP_GetDistance(us_addrs[i]);
+
+                    if(val > 0) {
+                        ultrasonic_data[i] = (uint16_t)val;
+                    } else {
+                        ultrasonic_data[i] = 0; // Error or Out of Range
+                    }
+                }
+                // Go back to Trigger state
+                us_state = 0;
+            }
+            break;
+    }
+}
 /* USER CODE END 4 */
 
 /**
