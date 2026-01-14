@@ -110,7 +110,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  LED_Update();
 	  Ultrasonic_Update();
-	  for (int i = 0; i < 4; i++) ultrasonic_data[i] = (uint16_t)rand();
 	  if (mosaic_send_sensors(ir_data, ultrasonic_data)){
 
 	  }
