@@ -86,8 +86,6 @@
 
 # Eclipse
 .buildpath
-.project
-.cproject
 .pydevproject
 .classpath
 
