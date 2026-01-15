@@ -33,7 +33,7 @@
 		<link>
 			<name>Shared</name>
 			<type>2</type>
-			<location>D:/Desktop/Dev/projects/rcj/stm32/rcj-soccer-bot/shared</location>
+			<locationURI>$%7BPARENT-1-PROJECT_LOC%7D/shared</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
