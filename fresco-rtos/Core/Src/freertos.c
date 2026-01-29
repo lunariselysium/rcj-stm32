@@ -25,7 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "uart_protocol.h"
+#include "motor_driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,7 +46,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+int count = 0;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -54,6 +55,25 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for parserTask */
+osThreadId_t parserTaskHandle;
+const osThreadAttr_t parserTask_attributes = {
+  .name = "parserTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for motorTask */
+osThreadId_t motorTaskHandle;
+const osThreadAttr_t motorTask_attributes = {
+  .name = "motorTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
+/* Definitions for sensorQueue */
+osMessageQueueId_t sensorQueueHandle;
+const osMessageQueueAttr_t sensorQueue_attributes = {
+  .name = "sensorQueue"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -61,6 +81,8 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
+void StartParserTask(void *argument);
+void StartMotorTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -98,6 +120,10 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of sensorQueue */
+  sensorQueueHandle = osMessageQueueNew (5, sizeof(sensor_packet_t), &sensorQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -105,6 +131,12 @@ void MX_FREERTOS_Init(void) {
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of parserTask */
+  parserTaskHandle = osThreadNew(StartParserTask, NULL, &parserTask_attributes);
+
+  /* creation of motorTask */
+  motorTaskHandle = osThreadNew(StartMotorTask, NULL, &motorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -126,12 +158,73 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+	sensor_packet_t packet;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+//	  if (osMessageQueueGet(sensorQueueHandle, &packet, NULL, osWaitForever) == osOK)
+//	  {
+//		  // --- Packet Received ---
+//	      uint16_t front_sensor = packet.ir_sensors[0];
+//	      protocol_stats_t current_stats = fresco_get_stats();
+//
+//      }
+	  // Move Forward at 1.0 m/s
+	        chassis_set_velocity(1.0f, 0.0f, 0.0f);
+	        osDelay(2000);
+
+	        // Slide Right at 0.5 m/s
+	        chassis_set_velocity(0.0f, 0.5f, 0.0f);
+	        osDelay(2000);
+
+	        // Spin in place (PI rad/s = 180 degrees/sec)
+	        chassis_set_velocity(0.0f, 0.0f, 3.14f);
+	        osDelay(1000);
+
+	        // Combine: Move Forward + Spin (Arc)
+	        chassis_set_velocity(0.5f, 0.0f, 1.0f);
+	        osDelay(2000);
+
+	        // Stop
+	        chassis_set_velocity(0.0f, 0.0f, 0.0f);
+	        osDelay(2000);
+    osDelay(10);
   }
   /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_StartParserTask */
+/**
+* @brief Function implementing the parserTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartParserTask */
+void StartParserTask(void *argument)
+{
+  /* USER CODE BEGIN StartParserTask */
+	extern UART_HandleTypeDef huart3;
+	fresco_init(&huart3, parserTaskHandle, sensorQueueHandle);
+	/* Infinite loop in function */
+	fresco_parser_task_entry();
+  /* USER CODE END StartParserTask */
+}
+
+/* USER CODE BEGIN Header_StartMotorTask */
+/**
+* @brief Function implementing the motorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartMotorTask */
+void StartMotorTask(void *argument)
+{
+  /* USER CODE BEGIN StartMotorTask */
+	extern CAN_HandleTypeDef hcan1;
+	motors_init(&hcan1);
+	/* Infinite loop in function */
+	motor_control_task_entry();
+  /* USER CODE END StartMotorTask */
 }
 
 /* Private application code --------------------------------------------------*/
