@@ -8,6 +8,7 @@
 
 
 #define MAX_CURRENT 10000
+#define MOTOR_MAX_RPM_LIMIT 30000
 
 void motors_init(CAN_HandleTypeDef* hcan);
 

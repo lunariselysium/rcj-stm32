@@ -83,10 +83,13 @@ void motor_control_task_entry(void) {
             // Calculate Target RPMs
             Wheel_Speeds_t target_speeds = kinematics_inverse(current_cmd);
 
-            motors[0].target_rpm = -(int16_t)target_speeds.fr;
-            motors[1].target_rpm = -(int16_t)target_speeds.br;
-            motors[2].target_rpm = (int16_t)target_speeds.bl;
-            motors[3].target_rpm = (int16_t)target_speeds.fl;
+			#define CLAMP_RPM(val) ((val) > MOTOR_MAX_RPM_LIMIT ? MOTOR_MAX_RPM_LIMIT : \
+                                   ((val) < -MOTOR_MAX_RPM_LIMIT ? -MOTOR_MAX_RPM_LIMIT : (val)))
+
+            motors[0].target_rpm = -(int16_t)CLAMP_RPM(target_speeds.fr);
+            motors[1].target_rpm = -(int16_t)CLAMP_RPM(target_speeds.br);
+            motors[2].target_rpm = (int16_t)CLAMP_RPM(target_speeds.bl);
+            motors[3].target_rpm = (int16_t)CLAMP_RPM(target_speeds.fl);
         }
 
         // 2. Update PIDs (Standard logic)
