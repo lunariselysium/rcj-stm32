@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "uart_protocol.h"
 #include "motor_driver.h"
+#include "witmotion_hwt101.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-int count = 0;
+WitMotion_Handle_t hwt101;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -69,6 +70,13 @@ const osThreadAttr_t motorTask_attributes = {
   .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
+/* Definitions for gyroTask */
+osThreadId_t gyroTaskHandle;
+const osThreadAttr_t gyroTask_attributes = {
+  .name = "gyroTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
 const osMessageQueueAttr_t sensorQueue_attributes = {
@@ -83,6 +91,7 @@ const osMessageQueueAttr_t sensorQueue_attributes = {
 void StartDefaultTask(void *argument);
 void StartParserTask(void *argument);
 void StartMotorTask(void *argument);
+void StartGyroTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -138,6 +147,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of motorTask */
   motorTaskHandle = osThreadNew(StartMotorTask, NULL, &motorTask_attributes);
 
+  /* creation of gyroTask */
+  gyroTaskHandle = osThreadNew(StartGyroTask, NULL, &gyroTask_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -159,6 +171,8 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
 	sensor_packet_t packet;
+	extern WitMotion_Handle_t hwt101;
+	extern int16_t sensorVal;
   /* Infinite loop */
   for(;;)
   {
@@ -225,6 +239,27 @@ void StartMotorTask(void *argument)
 	/* Infinite loop in function */
 	motor_control_task_entry();
   /* USER CODE END StartMotorTask */
+}
+
+/* USER CODE BEGIN Header_StartGyroTask */
+/**
+* @brief Function implementing the gyroTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartGyroTask */
+void StartGyroTask(void *argument)
+{
+  /* USER CODE BEGIN StartGyroTask */
+	extern I2C_HandleTypeDef hi2c1;
+	extern WitMotion_Handle_t hwt101;
+	while (WitMotion_Init(&hwt101, &hi2c1, HWT101_I2C_ADDR_DEFAULT) != HAL_OK) {
+	        // Initialization Error Loop
+		osDelay(100);
+	}
+	/* Infinite loop in function*/
+	WitMotion_TaskEntry(&hwt101);
+  /* USER CODE END StartGyroTask */
 }
 
 /* Private application code --------------------------------------------------*/
