@@ -28,6 +28,7 @@
 #include "uart_protocol.h"
 #include "motor_driver.h"
 #include "witmotion_hwt101.h"
+#include "ros_bridge.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,6 +78,13 @@ const osThreadAttr_t gyroTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
+/* Definitions for bridgeTask */
+osThreadId_t bridgeTaskHandle;
+const osThreadAttr_t bridgeTask_attributes = {
+  .name = "bridgeTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
 const osMessageQueueAttr_t sensorQueue_attributes = {
@@ -92,6 +100,7 @@ void StartDefaultTask(void *argument);
 void StartParserTask(void *argument);
 void StartMotorTask(void *argument);
 void StartGyroTask(void *argument);
+void StartBridgeTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -149,6 +158,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of gyroTask */
   gyroTaskHandle = osThreadNew(StartGyroTask, NULL, &gyroTask_attributes);
+
+  /* creation of bridgeTask */
+  bridgeTaskHandle = osThreadNew(StartBridgeTask, NULL, &bridgeTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -260,6 +272,23 @@ void StartGyroTask(void *argument)
 	/* Infinite loop in function*/
 	WitMotion_TaskEntry(&hwt101);
   /* USER CODE END StartGyroTask */
+}
+
+/* USER CODE BEGIN Header_StartBridgeTask */
+/**
+* @brief Function implementing the bridgeTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartBridgeTask */
+void StartBridgeTask(void *argument)
+{
+  /* USER CODE BEGIN StartBridgeTask */
+	static ROS_Bridge_Handle_t my_ros_bridge;
+	extern UART_HandleTypeDef huart1;
+	ROS_Bridge_Init(&my_ros_bridge, &huart1);
+
+  /* USER CODE END StartBridgeTask */
 }
 
 /* Private application code --------------------------------------------------*/
