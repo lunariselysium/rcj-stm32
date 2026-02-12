@@ -90,6 +90,11 @@ osMessageQueueId_t sensorQueueHandle;
 const osMessageQueueAttr_t sensorQueue_attributes = {
   .name = "sensorQueue"
 };
+/* Definitions for rosBridgeQueue */
+osMessageQueueId_t rosBridgeQueueHandle;
+const osMessageQueueAttr_t rosBridgeQueue_attributes = {
+  .name = "rosBridgeQueue"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -141,6 +146,9 @@ void MX_FREERTOS_Init(void) {
   /* Create the queue(s) */
   /* creation of sensorQueue */
   sensorQueueHandle = osMessageQueueNew (5, sizeof(sensor_packet_t), &sensorQueue_attributes);
+
+  /* creation of rosBridgeQueue */
+  rosBridgeQueueHandle = osMessageQueueNew (20, sizeof(BridgeMsgType_t), &rosBridgeQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -287,7 +295,7 @@ void StartBridgeTask(void *argument)
 	static ROS_Bridge_Handle_t my_ros_bridge;
 	extern UART_HandleTypeDef huart1;
 	ROS_Bridge_Init(&my_ros_bridge, &huart1);
-
+	ROS_Bridge_TaskEntry(&my_ros_bridge);
   /* USER CODE END StartBridgeTask */
 }
 

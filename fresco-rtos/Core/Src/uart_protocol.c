@@ -3,6 +3,7 @@
 // --- Config ---
 #define DMA_BUFFER_SIZE (FRAME_SIZE * 8) // Hold 8 frames in raw buffer
 
+
 // --- Private Variables ---
 static UART_HandleTypeDef *phuart;
 static osThreadId_t task_handle;
@@ -130,6 +131,11 @@ static void process_valid_packet(const sensor_packet_t* pkt) {
     if (osMessageQueuePut(queue_handle, pkt, 0, 0) != osOK) {
         stats.dma_overflows++; // Using this field to indicate Queue full
     }
+    // 3. Send to ROS Bridge Queue
+    BridgePacket_t packet;
+    packet.type = MSG_IR_SENSORS;
+    memcpy(packet.data.ir, pkt->ir_sensors, sizeof(packet.data.ir));
+    osMessageQueuePut(rosBridgeQueueHandle, &packet, 0, 0);
 }
 
 // --- Interrupt Callbacks ---
