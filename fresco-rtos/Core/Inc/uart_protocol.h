@@ -5,8 +5,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "ros_bridge.h"
-extern osMessageQueueId_t rosBridgeQueueHandle;
 
 #pragma pack(push, 1)
 typedef struct {

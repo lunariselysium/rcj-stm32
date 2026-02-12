@@ -148,7 +148,7 @@ void MX_FREERTOS_Init(void) {
   sensorQueueHandle = osMessageQueueNew (5, sizeof(sensor_packet_t), &sensorQueue_attributes);
 
   /* creation of rosBridgeQueue */
-  rosBridgeQueueHandle = osMessageQueueNew (20, sizeof(BridgeMsgType_t), &rosBridgeQueue_attributes);
+  rosBridgeQueueHandle = osMessageQueueNew (20, sizeof(BridgePacket_t), &rosBridgeQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -203,25 +203,25 @@ void StartDefaultTask(void *argument)
 //	      protocol_stats_t current_stats = fresco_get_stats();
 //
 //      }
-	  // Move Forward at 1.0 m/s
-	        chassis_set_velocity(1.0f, 0.0f, 0.0f);
-	        osDelay(2000);
-
-	        // Slide Right at 0.5 m/s
-	        chassis_set_velocity(0.0f, 0.5f, 0.0f);
-	        osDelay(2000);
-
-	        // Spin in place (PI rad/s = 180 degrees/sec)
-	        chassis_set_velocity(0.0f, 0.0f, 3.14f);
-	        osDelay(1000);
-
-	        // Combine: Move Forward + Spin (Arc)
-	        chassis_set_velocity(0.5f, 0.0f, 1.0f);
-	        osDelay(2000);
-
-	        // Stop
-	        chassis_set_velocity(0.0f, 0.0f, 0.0f);
-	        osDelay(2000);
+//	  // Move Forward at 1.0 m/s
+//	        chassis_set_velocity(1.0f, 0.0f, 0.0f);
+//	        osDelay(2000);
+//
+//	        // Slide Right at 0.5 m/s
+//	        chassis_set_velocity(0.0f, 0.5f, 0.0f);
+//	        osDelay(2000);
+//
+//	        // Spin in place (PI rad/s = 180 degrees/sec)
+//	        chassis_set_velocity(0.0f, 0.0f, 3.14f);
+//	        osDelay(1000);
+//
+//	        // Combine: Move Forward + Spin (Arc)
+//	        chassis_set_velocity(0.5f, 0.0f, 1.0f);
+//	        osDelay(2000);
+//
+//	        // Stop
+//	        chassis_set_velocity(0.0f, 0.0f, 0.0f);
+//	        osDelay(2000);
     osDelay(10);
   }
   /* USER CODE END StartDefaultTask */

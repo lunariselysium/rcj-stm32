@@ -3,6 +3,9 @@
 // --- Config ---
 #define DMA_BUFFER_SIZE (FRAME_SIZE * 8) // Hold 8 frames in raw buffer
 
+#include "ros_bridge.h"
+extern osMessageQueueId_t rosBridgeQueueHandle;
+
 
 // --- Private Variables ---
 static UART_HandleTypeDef *phuart;

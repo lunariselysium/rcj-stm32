@@ -105,9 +105,9 @@ void ROS_Bridge_TaskEntry(void *argument){
 				case MSG_IR_SENSORS:
 					ROS_Bridge_Send_Packet(dev, 0x10, &tx_buff.data.ir, 32);
 					break;
-				case MSG_YAW:
-					ROS_Bridge_Send_Packet(dev, 0x11, &tx_buff, 6);
-					break;
+//				case MSG_YAW:
+//					ROS_Bridge_Send_Packet(dev, 0x11, &tx_buff, 6);
+//					break;
 			}
 		}
 
@@ -130,12 +130,11 @@ void ROS_Bridge_TaskEntry(void *argument){
             payload[4] = (uint8_t)(current_yaw & 0xFF);
             payload[5] = (uint8_t)((current_yaw >> 8) & 0xFF);
 
-//            ROS_Bridge_Send_Packet(dev, 0x11, &payload, 6);
+            ROS_Bridge_Send_Packet(dev, 0x11, &payload, 6);
 //            MotorState_t motors = Motor_GetState();
 
             // Send them straight to the UART
-            ROS_Bridge_Send_Packet(&dev, 0x13, &motors, sizeof(motors));
-            osDelay(1);
+//            ROS_Bridge_Send_Packet(&dev, 0x13, &motors, sizeof(motors));
         }
 
 	}
@@ -219,13 +218,13 @@ void ROS_Bridge_Process_RX(ROS_Bridge_Handle_t *dev) {
                             case 0x50: { // Cmd_Vel
                                 Cmd_Vel_t vel;
                                 memcpy(&vel, payload, sizeof(Cmd_Vel_t));
-                                chassis_set_velocity(vel->vel_x, vel->vel_y, vel->omega);
+                                chassis_set_velocity(vel.vel_x, vel.vel_y, vel.omega);
                                 break;
                             }
                             case 0x51: { // Cmd_RPM
                                 Cmd_RPM_t rpm;
                                 memcpy(&rpm, payload, sizeof(Cmd_RPM_t));
-                                motors_set_rpm_manual(rpm->m1, rpm->m2, rpm->m3, rpm->m4);
+                                motors_set_rpm_manual(rpm.m1, rpm.m2, rpm.m3, rpm.m4);
                                 break;
                             }
                             // Add more cases here
