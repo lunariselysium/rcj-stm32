@@ -118,7 +118,7 @@ void ROS_Bridge_TaskEntry(void *argument){
 
             // Grab the latest values from the other modules
             uint32_t ts = HAL_GetTick();
-            uint16_t current_yaw = WitMotion_GetData(&hwt101);
+            uint16_t current_yaw = WitMotion_GetYaw_Degrees(&hwt101);
             uint8_t payload[6];
             // Pack 32-bit Timestamp (Little Endian)
             payload[0] = (uint8_t)(ts & 0xFF);

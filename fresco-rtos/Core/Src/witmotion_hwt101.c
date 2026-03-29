@@ -65,7 +65,7 @@ HAL_StatusTypeDef WitMotion_Update(WitMotion_Handle_t *dev) {
         return status;
     }
 
-    dev->yaw = raw_data[0] << 8 | raw_data[1];
+    dev->yaw = (int16_t)((raw_data[1] << 8) | raw_data[0]);
 
     return HAL_OK;
 }
@@ -96,24 +96,31 @@ void WitMotion_TaskEntry(void *argument)
 }
 
 /**
- * @brief  Thread-safe getter for the latest data
- * @return WitMotion_Data_t Copy of the data struct
+ * @brief  Thread-safe getter for the raw sensor value.
  */
-uint16_t WitMotion_GetData(WitMotion_Handle_t *dev) {
-    uint16_t yaw = -1;
+int16_t WitMotion_GetRawData(WitMotion_Handle_t *dev) {
+    int16_t raw_yaw = 0;
 
-    if (dev->lock == NULL) {
-            return yaw; // Return empty data if not initialized yet
-        }
-
-    // Protect reading the struct so we don't get half-updated data
-    if (xSemaphoreTake(dev->lock, pdMS_TO_TICKS(10)) == pdTRUE) {
-        yaw = dev->yaw;
-        xSemaphoreGive(dev->lock);
-    } else {
-        // If we can't take lock, return whatever is there (or handle error)
-        yaw = dev->yaw;
+    if (dev == NULL || dev->lock == NULL) {
+        return 0; // Not initialized
     }
 
-    return yaw;
+    // Protect reading the variable so we don't get half-updated data
+    if (xSemaphoreTake(dev->lock, pdMS_TO_TICKS(10)) == pdTRUE) {
+        raw_yaw = dev->yaw;
+        xSemaphoreGive(dev->lock);
+    }
+
+    return raw_yaw;
+}
+
+/**
+ * @brief  Thread-safe getter for the latest yaw data in degrees.
+ */
+float WitMotion_GetYaw_Degrees(WitMotion_Handle_t *dev) {
+    // Get the raw data using our thread-safe getter
+    int16_t raw_value = WitMotion_GetRawData(dev);
+
+    // Apply the conversion factor and return
+    return (float)raw_value * WITMOTION_RAW_TO_DEG;
 }

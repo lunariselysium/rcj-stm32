@@ -49,6 +49,8 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 WitMotion_Handle_t hwt101;
+float yaw = 0;
+int16_t yaw_raw=0;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -196,6 +198,8 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	  yaw = WitMotion_GetYaw_Degrees(&hwt101);
+	  yaw_raw = WitMotion_GetRawData(&hwt101);
 //	  if (osMessageQueueGet(sensorQueueHandle, &packet, NULL, osWaitForever) == osOK)
 //	  {
 //		  // --- Packet Received ---
