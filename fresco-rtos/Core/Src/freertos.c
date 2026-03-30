@@ -27,7 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "uart_protocol.h"
 #include "motor_driver.h"
-#include "witmotion_hwt101.h"
+#include "bno085_app.h"
 #include "ros_bridge.h"
 /* USER CODE END Includes */
 
@@ -48,9 +48,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-WitMotion_Handle_t hwt101;
-float yaw = 0;
-int16_t yaw_raw=0;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -193,13 +190,10 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
 	sensor_packet_t packet;
-	extern WitMotion_Handle_t hwt101;
 	extern int16_t sensorVal;
   /* Infinite loop */
   for(;;)
   {
-	  yaw = WitMotion_GetYaw_Degrees(&hwt101);
-	  yaw_raw = WitMotion_GetRawData(&hwt101);
 //	  if (osMessageQueueGet(sensorQueueHandle, &packet, NULL, osWaitForever) == osOK)
 //	  {
 //		  // --- Packet Received ---
@@ -275,14 +269,8 @@ void StartMotorTask(void *argument)
 void StartGyroTask(void *argument)
 {
   /* USER CODE BEGIN StartGyroTask */
-	extern I2C_HandleTypeDef hi2c1;
-	extern WitMotion_Handle_t hwt101;
-	while (WitMotion_Init(&hwt101, &hi2c1, HWT101_I2C_ADDR_DEFAULT) != HAL_OK) {
-	        // Initialization Error Loop
-		osDelay(100);
-	}
-	/* Infinite loop in function*/
-	WitMotion_TaskEntry(&hwt101);
+//	extern I2C_HandleTypeDef hi2c1;
+	bno085TaskEntry(argument);
   /* USER CODE END StartGyroTask */
 }
 

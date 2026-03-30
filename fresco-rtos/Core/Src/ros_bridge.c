@@ -4,8 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "witmotion_hwt101.h"
-
 // Helper to access the DMA instance (DMA2_Stream2)
 #define GET_DMA_COUNTER(dev) __HAL_DMA_GET_COUNTER((dev)->huart->hdmarx)
 
@@ -81,7 +79,6 @@ HAL_StatusTypeDef ROS_Bridge_Send_Packet(ROS_Bridge_Handle_t *dev, uint8_t id, v
 
 
 void ROS_Bridge_TaskEntry(void *argument){
-	extern WitMotion_Handle_t hwt101;
 	// 1. Recover the handle from the void pointer
 	ROS_Bridge_Handle_t *dev = (ROS_Bridge_Handle_t *)argument;
 
@@ -105,9 +102,9 @@ void ROS_Bridge_TaskEntry(void *argument){
 				case MSG_IR_SENSORS:
 					ROS_Bridge_Send_Packet(dev, 0x10, &tx_buff.data.ir, 32);
 					break;
-//				case MSG_YAW:
-//					ROS_Bridge_Send_Packet(dev, 0x11, &tx_buff, 6);
-//					break;
+				case MSG_YAW:
+					ROS_Bridge_Send_Packet(dev, 0x11, &tx_buff.data.yaw, 2);
+					break;
 			}
 		}
 
@@ -117,20 +114,8 @@ void ROS_Bridge_TaskEntry(void *argument){
             last_telemetry_time = now;
 
             // Grab the latest values from the other modules
-            uint32_t ts = HAL_GetTick();
-            uint16_t current_yaw = WitMotion_GetYaw_Degrees(&hwt101);
-            uint8_t payload[6];
-            // Pack 32-bit Timestamp (Little Endian)
-            payload[0] = (uint8_t)(ts & 0xFF);
-            payload[1] = (uint8_t)((ts >> 8) & 0xFF);
-            payload[2] = (uint8_t)((ts >> 16) & 0xFF);
-            payload[3] = (uint8_t)((ts >> 24) & 0xFF);
-
-            // Pack 16-bit Yaw (Little Endian)
-            payload[4] = (uint8_t)(current_yaw & 0xFF);
-            payload[5] = (uint8_t)((current_yaw >> 8) & 0xFF);
-
-            ROS_Bridge_Send_Packet(dev, 0x11, &payload, 6);
+//
+//            ROS_Bridge_Send_Packet(dev, 0x11, &payload, 6);
 //            MotorState_t motors = Motor_GetState();
 
             // Send them straight to the UART

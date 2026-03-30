@@ -1,0 +1,3 @@
+[submodule "fresco-rtos/External/SH2"]
+	path = fresco-rtos/External/SH2
+	url = https://github.com/ceva-dsp/sh2
