@@ -13,7 +13,7 @@
 
 // Motor Gear Ratio (if 19:1 gearbox, enter 19.0f)
 // If the RPM you read from CAN is already "Output Shaft RPM", set to 1.0f
-#define GEAR_RATIO 19.0f
+#define GEAR_RATIO 36.0f
 
 // --- Math Constants ---
 #define RPM_TO_RADS (2.0f * 3.14159f / 60.0f)
@@ -34,3 +34,6 @@ typedef struct {
 
 // Function to calculate wheel RPMs from chassis velocity
 Wheel_Speeds_t kinematics_inverse(Chassis_Velocity_t cmd);
+
+// Function to calculate chassis velocity from wheel RPMs
+Chassis_Velocity_t kinematics_forward(Wheel_Speeds_t wheel_rpm);

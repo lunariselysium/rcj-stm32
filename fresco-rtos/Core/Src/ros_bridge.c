@@ -1,6 +1,7 @@
 
 #include "ros_bridge.h"
 #include "cobs.h"
+#include "odometry.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -113,13 +114,9 @@ void ROS_Bridge_TaskEntry(void *argument){
         if ((now - last_telemetry_time) >= 50) { // 50ms = 20Hz
             last_telemetry_time = now;
 
-            // Grab the latest values from the other modules
-//
-//            ROS_Bridge_Send_Packet(dev, 0x11, &payload, 6);
-//            MotorState_t motors = Motor_GetState();
-
-            // Send them straight to the UART
-//            ROS_Bridge_Send_Packet(&dev, 0x13, &motors, sizeof(motors));
+            // Send Odometry (packet ID 0x13)
+            Pose2D_t pose = odometry_get_pose();
+            ROS_Bridge_Send_Packet(dev, 0x13, &pose, sizeof(Pose2D_t));
         }
 
 	}

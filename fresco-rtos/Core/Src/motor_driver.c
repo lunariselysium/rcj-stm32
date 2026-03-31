@@ -1,6 +1,7 @@
 /* motor_driver.c */
 #include "motor_driver.h"
 #include "cmsis_os.h" // For osDelay
+#include "odometry.h"
 #include <stdbool.h>
 
 // --- PID Configuration ---
@@ -15,6 +16,8 @@ typedef struct {
     PIDController pid;
     volatile int16_t current_rpm; // Updated by ISR
     volatile int16_t target_rpm;  // Updated by App
+    volatile uint16_t raw_angle;  // 0-8191 (13-bit encoder)
+    volatile int16_t current_ma;  // Motor current in mA
 } Motor_t;
 
 // --- Private Variables ---
@@ -39,6 +42,8 @@ void motors_init(CAN_HandleTypeDef* hcan) {
     for(int i=0; i<4; i++) {
         motors[i].current_rpm = 0;
         motors[i].target_rpm = 0;
+        motors[i].raw_angle = 0;
+        motors[i].current_ma = 0;
 
         motors[i].pid.Kp = PID_KP;
         motors[i].pid.Ki = PID_KI;
@@ -65,6 +70,9 @@ void motor_control_task_entry(void) {
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(1);
     xLastWakeTime = xTaskGetTickCount();
+    
+    static uint32_t odometry_counter = 0;
+    odometry_init();
 
     while (1) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -99,7 +107,14 @@ void motor_control_task_entry(void) {
                                  (float)motors[i].current_rpm);
         }
 
-        // 3. Send CAN
+        // 3. Update Odometry (every 10 ms)
+        odometry_counter++;
+        if (odometry_counter >= 10) {
+            odometry_update(0.01f); // 10 ms = 0.01 seconds
+            odometry_counter = 0;
+        }
+
+        // 4. Send CAN
         send_can_command();
     }
 }
@@ -118,6 +133,16 @@ void motors_set_rpm_manual(int16_t m1, int16_t m2, int16_t m3, int16_t m4) {
 
 int16_t motors_get_rpm(uint8_t motor_index) {
     if (motor_index < 4) return motors[motor_index].current_rpm;
+    return 0;
+}
+
+uint16_t motors_get_raw_angle(uint8_t motor_index) {
+    if (motor_index < 4) return motors[motor_index].raw_angle;
+    return 0;
+}
+
+int16_t motors_get_current_ma(uint8_t motor_index) {
+    if (motor_index < 4) return motors[motor_index].current_ma;
     return 0;
 }
 
@@ -165,9 +190,13 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
             // Speed is usually bytes [2] and [3] (High byte first)
             int16_t speed = (rx_data[2] << 8) | rx_data[3];
+            uint16_t angle = (rx_data[0] << 8) | rx_data[1];
+            int16_t current = (rx_data[4] << 8) | rx_data[5];
 
             if (index < 4) {
                 motors[index].current_rpm = speed;
+                motors[index].raw_angle = angle;
+                motors[index].current_ma = current;
             }
         }
     }

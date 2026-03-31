@@ -33,3 +33,23 @@ Wheel_Speeds_t kinematics_inverse(Chassis_Velocity_t cmd) {
 
     return wheel_rpm;
 }
+
+Chassis_Velocity_t kinematics_forward(Wheel_Speeds_t wheel_rpm) {
+    Chassis_Velocity_t chassis;
+    
+    // Convert wheel RPM to linear speeds (m/s)
+    float conversion_factor = (1.0f / WHEEL_RADIUS_M) * RPM_TO_RADS * GEAR_RATIO;
+    float inv_conversion = 1.0f / conversion_factor;
+    
+    float linear_fl = wheel_rpm.fl * inv_conversion;
+    float linear_fr = wheel_rpm.fr * inv_conversion;
+    float linear_bl = wheel_rpm.bl * inv_conversion;
+    float linear_br = wheel_rpm.br * inv_conversion;
+    
+    // Solve for v_x, v_y, omega using derived equations
+    chassis.v_x = (linear_fl + linear_fr + linear_bl + linear_br) * 0.25f;
+    chassis.v_y = ((linear_fl + linear_br) - (linear_fr + linear_bl)) * 0.25f;
+    chassis.omega = ((linear_fl + linear_bl) - (linear_fr + linear_br)) * 0.25f / CHASSIS_RADIUS_M;
+    
+    return chassis;
+}
