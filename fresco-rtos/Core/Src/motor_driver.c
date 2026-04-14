@@ -151,7 +151,7 @@ void chassis_set_velocity(float vx, float vy, float omega) {
     taskENTER_CRITICAL();
     target_vel.v_x = vx;
     target_vel.v_y = vy;
-    target_vel.omega = omega;
+    target_vel.omega = -omega;
     manual_mode = false;
     taskEXIT_CRITICAL();
 }
