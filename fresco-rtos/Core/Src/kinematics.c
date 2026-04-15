@@ -16,11 +16,10 @@ Wheel_Speeds_t kinematics_inverse(Chassis_Velocity_t cmd) {
 
     // 3. Combine
     // We mix x, y and rotation.
-    // Note: You might need to flip signs depending on your specific wiring!
-    float linear_fl = cmd.v_x + cmd.v_y + v_rot;
-    float linear_fr = cmd.v_x - cmd.v_y - v_rot;
-    float linear_bl = cmd.v_x - cmd.v_y + v_rot;
-    float linear_br = cmd.v_x + cmd.v_y - v_rot;
+    float linear_fl = cmd.v_x - cmd.v_y - v_rot;
+    float linear_fr = cmd.v_x - cmd.v_y + v_rot;
+    float linear_bl = cmd.v_x + cmd.v_y - v_rot;
+    float linear_br = cmd.v_x + cmd.v_y + v_rot;
 
     // 4. Convert linear m/s to Wheel RPM
     // RPM = (Linear Speed / Wheel Circumference) * 60 * GearRatio
