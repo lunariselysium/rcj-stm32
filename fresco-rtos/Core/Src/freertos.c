@@ -57,10 +57,14 @@
 #define IR_THRESHOLD 4000          // ADC value below which ball is detected (lower = stronger)
 #define BALL_LOST_TIMEOUT_MS 1000   // use last known ball direction for this long
 #define ALIGN_THRESHOLD_RAD 0.4f   // ~5.7 degrees
-#define SEARCH_SPIN_SPEED 0.5f     // rad/s
-#define ALIGN_KP 1.8f              // proportional gain for alignment
-#define MAX_OMEGA 3.0f             // maximum angular speed (rad/s)
-#define DRIVE_SPEED 0.6f           // m/s
+#define SEARCH_SPIN_SPEED 0.2f     // rad/s
+#define ALIGN_KP 1.5f              // proportional gain for alignment
+#define MAX_OMEGA 2.0f             // maximum angular speed (rad/s)
+#define DRIVE_SPEED 0.4f           // m/s
+#define HEADING_KP 2.0f                // Proportional gain for maintaining heading (TUNE THIS!)
+#define PUSH_ENTRY_BALL_ANGLE_RAD 0.2f // ~11.5 degrees. Ball must be within this angle in front.
+#define PUSH_ENTRY_YAW_ANGLE_RAD 0.2f  // ~11.5 degrees. Robot must be facing goal within this angle.
+#define PUSH_EXIT_BALL_ANGLE_RAD 0.6f  // ~34 degrees. If ball angle exceeds this, stop pushing. (TUNE THIS!)
 #define M_PI 3.14159265358979323846f
 
 // Helper macro to clamp a value between min and max
@@ -69,13 +73,17 @@
 typedef enum {
     STRATEGY_SEARCH,
     STRATEGY_ALIGN,
-    STRATEGY_DRIVE
+    STRATEGY_DRIVE,
+	STRATEGY_PUSH
 } strategy_state_t;
 
 static strategy_state_t strategy_state = STRATEGY_SEARCH;
 static float last_ball_direction_rad = 0.0f;  // radians, 0 = front, positive CCW
 static uint32_t ball_last_seen_time = 0;      // HAL_GetTick() when ball was last detected
-static bool ball_currently_detected = false;
+
+sensor_packet_t packet;
+static volatile float yaw_rad;
+static float global_ball_heading;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -217,17 +225,22 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-	sensor_packet_t packet;
-	uint32_t current_time;
-	float ball_direction_rad;
-	bool ball_detected;
-  /* Infinite loop */
-  for(;;)
-  {
+//	  sensor_packet_t packet;
+	  uint32_t current_time;
+	  float target_angle = 0.0f;
+	  bool ball_detected = false;
+	  static bool is_orbiting = false; // Tracks if we are circling behind the ball
+	  static bool orbit_left = false;
+
+	  // External declaration for IMU function
+	  extern uint16_t BNO085_GetYaw_Degrees(void);
+
+	  /* Infinite loop */
+	  for(;;)
+	  {
 	    current_time = HAL_GetTick();
 
-	    // 1. Drain the queue to get the FRESHEST sensor data
-	    // Using 'while' ensures we process all backlogged messages to eliminate lag
+	    // 1. Drain the queue to get the FRESHEST sensor data (Zero Lag)
 	    while (osMessageQueueGet(sensorQueueHandle, &packet, NULL, 0) == osOK)
 	    {
 	      uint16_t min_adc = 4095;
@@ -241,12 +254,10 @@ void StartDefaultTask(void *argument)
 	        }
 	      }
 
-	      // If we see the ball in this fresh packet, update the timestamp and angle
 	      if (min_adc < IR_THRESHOLD)
 	      {
 	        ball_last_seen_time = current_time;
 
-	        // Vector sum weighted by reflection strength for robust direction
 	        float sum_x = 0.0f;
 	        float sum_y = 0.0f;
 	        float total_weight = 0.0f;
@@ -268,7 +279,6 @@ void StartDefaultTask(void *argument)
 	        }
 	        else
 	        {
-	          // fallback to strongest sensor
 	          last_ball_direction_rad = min_idx * IR_SENSOR_ANGLE_DEG * (M_PI / 180.0f);
 	          while (last_ball_direction_rad > M_PI) last_ball_direction_rad -= 2 * M_PI;
 	          while (last_ball_direction_rad < -M_PI) last_ball_direction_rad += 2 * M_PI;
@@ -276,83 +286,141 @@ void StartDefaultTask(void *argument)
 	      }
 	    }
 
-	    // 2. Single Source of Truth for Ball Detection (The Timeout)
-	    // Make sure ball_last_seen_time != 0 so it doesn't falsely trigger at startup
+	    // 2. Ball logic & Goal Alignment
 	    if (ball_last_seen_time != 0 && (current_time - ball_last_seen_time < BALL_LOST_TIMEOUT_MS))
 	    {
 	      ball_detected = true;
-	      ball_direction_rad = last_ball_direction_rad;
+
+	      // Get Robot Heading (0 is opponent goal)
+//	      float yaw_rad = BNO085_GetYaw_Degrees() * (M_PI / 180.0f);
+	      yaw_rad = BNO085_GetYaw_Degrees() * (M_PI / 180.0f);
+	      while (yaw_rad > M_PI) yaw_rad -= 2.0f * M_PI;
+	      while (yaw_rad < -M_PI) yaw_rad += 2.0f * M_PI;
+
+	      // Calculate Global Heading of the ball from the robot
+//	      float global_ball_heading = yaw_rad + last_ball_direction_rad;
+	      global_ball_heading = yaw_rad + last_ball_direction_rad;
+	      while (global_ball_heading > M_PI) global_ball_heading -= 2.0f * M_PI;
+	      while (global_ball_heading < -M_PI) global_ball_heading += 2.0f * M_PI;
+
+	      // Hysteresis to switch smoothly between Attacking and Orbiting
+	      float abs_gbh = fabs(global_ball_heading);
+	      if (is_orbiting) {
+	          // Stop orbiting once we are safely facing the opponent side
+	          if (abs_gbh < (M_PI / 6.0f)) {
+	              is_orbiting = false;
+	          }
+	      } else {
+	          // Start orbiting if pushing would send it to our own half
+	          if (abs_gbh > (M_PI / 3.0f)) {
+	              is_orbiting = true;
+	              // LOCK IN THE DIRECTION HERE:
+	              // If the ball's global heading is positive, we commit to going Left.
+	              orbit_left = (global_ball_heading > 0);
+	          }
+	      }
+
+//	      target_angle = last_ball_direction_rad;
+//
+//	      if (is_orbiting) {
+//	          // Add a 1.5 rad (~85 deg) offset to curve around the side of the ball
+//	          if (global_ball_heading > 0) target_angle -= 1.5f;
+//	          else target_angle += 1.5f;
+//
+//	          // Re-normalize target angle to bounds
+//	          while (target_angle > M_PI) target_angle -= 2.0f * M_PI;
+//	          while (target_angle < -M_PI) target_angle += 2.0f * M_PI;
+//	      }
 	    }
 	    else
 	    {
 	      ball_detected = false;
 	    }
-    
-    // State machine
-    switch (strategy_state)
-        {
-          case STRATEGY_SEARCH:
-            // If ball is seen, move to align
-            if (ball_detected)
-            {
-              strategy_state = STRATEGY_ALIGN;
-            }
-            else
-            {
-              // Spin slowly to find ball
-              chassis_set_velocity(0.0f, 0.0f, SEARCH_SPIN_SPEED);
-            }
-            break;
 
-          case STRATEGY_ALIGN:
-            if (ball_detected)
-            {
-              float error_rad = ball_direction_rad; // 0 = front, positive CCW
+	    // 3. State machine
+	    switch (strategy_state)
+	        {
+	          case STRATEGY_SEARCH:
+	            if (ball_detected) strategy_state = STRATEGY_ALIGN; // We'll repurpose ALIGN as TRACK
+	            else chassis_set_velocity(0.0f, 0.0f, SEARCH_SPIN_SPEED);
+	            break;
 
-              // Proportional controller for rotation
-              float omega = CLAMP(ALIGN_KP * error_rad, -MAX_OMEGA, MAX_OMEGA);
-              chassis_set_velocity(0.0f, 0.0f, omega);
+	          case STRATEGY_ALIGN: // Acts as TRACKING and ORBITING
+	            if (ball_detected)
+	            {
+	              // 1. ALWAYS aim to face the ball directly
+	              float error_rad = last_ball_direction_rad;
+	              float omega = CLAMP(ALIGN_KP * error_rad, -MAX_OMEGA, MAX_OMEGA);
 
-              // Check if aligned (error within threshold)
-              if (fabs(error_rad) < ALIGN_THRESHOLD_RAD)
-              {
-                strategy_state = STRATEGY_DRIVE;
-              }
-            }
-            else
-            {
-              // Timeout expired, ball completely lost
-              strategy_state = STRATEGY_SEARCH;
-            }
-            break;
+	              float vx = 0.0f;
+	              float vy = 0.0f;
 
-          case STRATEGY_DRIVE:
-            if (ball_detected)
-            {
-              float error_rad = ball_direction_rad;
+	              // 2. Decide movement based on Goal Alignment
+	              if (is_orbiting) {
+	                  vy = orbit_left ? DRIVE_SPEED : -DRIVE_SPEED;
+	                  vx = 0.0f; // Perfect circle orbit
+                      vy = vy*0.8;
+                      omega = omega*1.45;
+	                  chassis_set_velocity(vx, vy, omega);
+	              } else {
+	                  // ATTACK MODE
+	                  // Check if we meet the conditions to start a straight push
+	                  if (fabs(last_ball_direction_rad) < PUSH_ENTRY_BALL_ANGLE_RAD && fabs(yaw_rad) < PUSH_ENTRY_YAW_ANGLE_RAD)
+	                  {
+	                      // Conditions met: Ball is centered, robot is facing goal.
+	                      strategy_state = STRATEGY_PUSH;
+	                  }
+	                  else
+	                  {
+	                      // Not aligned enough yet, continue driving towards the ball.
+	                      vx = DRIVE_SPEED;
+	                      chassis_set_velocity(vx, 0.0f, omega);
+	                  }
+	              }
+	            }
+	            else
+	            {
+	              strategy_state = STRATEGY_SEARCH;
+	            }
+	            break;
 
-              // Hysteresis: If ball drifts too far off-center, stop driving and realign
-              if (fabs(error_rad) > ALIGN_THRESHOLD_RAD * 2.0f)
-              {
-                strategy_state = STRATEGY_ALIGN;
-              }
-              else
-              {
-                // Continuously adjust heading (omega) while driving forward
-                float omega = CLAMP(ALIGN_KP * error_rad, -MAX_OMEGA, MAX_OMEGA);
-                chassis_set_velocity(DRIVE_SPEED, 0.0f, omega);
-              }
-            }
-            else
-            {
-              // Timeout expired, ball completely lost
-              strategy_state = STRATEGY_SEARCH;
-            }
-            break;
-    }
-    
-    osDelay(20); // 50 Hz strategy loop
-  }
+	          case STRATEGY_DRIVE:
+	            // State completely removed to prevent fighting!
+	            break;
+
+	    	case STRATEGY_PUSH:
+	    		if (ball_detected)
+	    		        {
+	    		            // Has the ball slipped out of the front of the robot?
+	    		            if (fabs(last_ball_direction_rad) > PUSH_EXIT_BALL_ANGLE_RAD)
+	    		            {
+	    		                // The ball is still detected, but it's too far to the side.
+	    		                // Go back to ALIGN to actively recover and re-center it.
+	    		                strategy_state = STRATEGY_ALIGN;
+	    		            }
+	    		            else
+	    		            {
+	    		                // Ball is still securely in front. Continue the straight push.
+	    		                // Goal: Maintain heading of 0 radians (straight at opponent goal)
+	    		                float heading_error_rad = 0.0f + yaw_rad;
+
+	    		                // P-controller to correct heading drift
+	    		                float omega = CLAMP(HEADING_KP * heading_error_rad, -MAX_OMEGA, MAX_OMEGA);
+
+	    		                // Push forward at full speed.
+	    		                chassis_set_velocity(DRIVE_SPEED, 0.0f, omega);
+	    		            }
+	    		        }
+	    		        else
+	    		        {
+	    		            // Ball has been completely lost, go back to searching for it.
+	    		            strategy_state = STRATEGY_SEARCH;
+	    		        }
+	    		        break;
+	    }
+
+	    osDelay(20);
+	  }
   /* USER CODE END StartDefaultTask */
 }
 
